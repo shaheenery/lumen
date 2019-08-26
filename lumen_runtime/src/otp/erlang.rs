@@ -286,6 +286,21 @@ pub fn binary_part_3(
                         .map_err(|error| error.into())
                 }
             }
+            TypedTerm::BinaryLiteral(process_binary) => {
+                let available_byte_count = process_binary.full_byte_len();
+                let PartRange {
+                    byte_offset,
+                    byte_len,
+                } = start_length_to_part_range(start_usize, length_isize, available_byte_count)?;
+
+                if (byte_offset == 0) && (byte_len == available_byte_count) {
+                    Ok(binary)
+                } else {
+                    process_control_block
+                        .subbinary_from_original(binary, byte_offset, 0, byte_len, 0)
+                        .map_err(|error| error.into())
+                }
+            }
             TypedTerm::SubBinary(subbinary) => {
                 let PartRange {
                     byte_offset,
@@ -331,6 +346,9 @@ pub fn binary_to_atom_2(binary: Term, encoding: Term) -> Result {
             TypedTerm::ProcBin(process_binary) => {
                 Atom::try_from_latin1_bytes(process_binary.as_bytes()).map_err(|error| error.into())
             }
+            TypedTerm::BinaryLiteral(process_binary) => {
+                Atom::try_from_latin1_bytes(process_binary.as_bytes()).map_err(|error| error.into())
+            }
             TypedTerm::SubBinary(subbinary) => {
                 if subbinary.is_binary() {
                     if subbinary.is_aligned() {
@@ -364,6 +382,10 @@ pub fn binary_to_existing_atom_2(binary: Term, encoding: Term) -> Result {
                     .map_err(|error| error.into())
             }
             TypedTerm::ProcBin(process_binary) => {
+                Atom::try_from_latin1_bytes_existing(process_binary.as_bytes())
+                    .map_err(|error| error.into())
+            }
+            TypedTerm::BinaryLiteral(process_binary) => {
                 Atom::try_from_latin1_bytes_existing(process_binary.as_bytes())
                     .map_err(|error| error.into())
             }
@@ -525,6 +547,7 @@ pub fn binary_to_term_2(
         TypedTerm::Boxed(boxed) => match boxed.to_typed_term().unwrap() {
             TypedTerm::HeapBinary(_heap_binary) => unimplemented!(),
             TypedTerm::ProcBin(_process_binary) => unimplemented!(),
+            TypedTerm::BinaryLiteral(_process_binary) => unimplemented!(),
             TypedTerm::SubBinary(_subbinary) => unimplemented!(),
             _ => Err(badarg!().into()),
         },
@@ -537,6 +560,7 @@ pub fn bit_size_1(bitstring: Term, process_control_block: &ProcessControlBlock) 
         TypedTerm::Boxed(boxed) => match boxed.to_typed_term().unwrap() {
             TypedTerm::HeapBinary(heap_binary) => Some(heap_binary.total_bit_len()),
             TypedTerm::ProcBin(process_binary) => Some(process_binary.total_bit_len()),
+            TypedTerm::BinaryLiteral(process_binary) => Some(process_binary.total_bit_len()),
             TypedTerm::SubBinary(subbinary) => Some(subbinary.total_bit_len()),
             _ => None,
         },
@@ -567,6 +591,14 @@ pub fn bitstring_to_list_1<'process>(
                     .map_err(|error| error.into())
             }
             TypedTerm::ProcBin(process_binary) => {
+                let byte_term_iter = process_binary.as_bytes().iter().map(|byte| (*byte).into());
+                let last = Term::NIL;
+
+                process_control_block
+                    .improper_list_from_iter(byte_term_iter, last)
+                    .map_err(|error| error.into())
+            }
+            TypedTerm::BinaryLiteral(process_binary) => {
                 let byte_term_iter = process_binary.as_bytes().iter().map(|byte| (*byte).into());
                 let last = Term::NIL;
 
@@ -660,6 +692,7 @@ pub fn byte_size_1(bitstring: Term, process_control_block: &ProcessControlBlock)
         TypedTerm::Boxed(boxed) => match boxed.to_typed_term().unwrap() {
             TypedTerm::HeapBinary(heap_binary) => Some(heap_binary.total_byte_len()),
             TypedTerm::ProcBin(process_binary) => Some(process_binary.total_byte_len()),
+            TypedTerm::BinaryLiteral(process_binary) => Some(process_binary.total_byte_len()),
             TypedTerm::SubBinary(subbinary) => Some(subbinary.total_byte_len()),
             _ => None,
         },
@@ -1500,6 +1533,7 @@ pub fn size_1(binary_or_tuple: Term, process_control_block: &ProcessControlBlock
             TypedTerm::Tuple(tuple) => Some(tuple.len()),
             TypedTerm::HeapBinary(heap_binary) => Some(heap_binary.full_byte_len()),
             TypedTerm::ProcBin(process_binary) => Some(process_binary.full_byte_len()),
+            TypedTerm::BinaryLiteral(process_binary) => Some(process_binary.full_byte_len()),
             TypedTerm::SubBinary(subbinary) => Some(subbinary.full_byte_len()),
             _ => None,
         },
@@ -1523,7 +1557,8 @@ pub fn split_binary_2(
         TypedTerm::Boxed(boxed) => {
             match boxed.to_typed_term().unwrap() {
                 unboxed_typed_term @ TypedTerm::HeapBinary(_)
-                | unboxed_typed_term @ TypedTerm::ProcBin(_) => {
+                | unboxed_typed_term @ TypedTerm::ProcBin(_)
+                | unboxed_typed_term @ TypedTerm::BinaryLiteral(_) => {
                     if index == 0 {
                         let mut heap = process_control_block.acquire_heap();
 
@@ -1537,6 +1572,7 @@ pub fn split_binary_2(
                         let full_byte_length = match unboxed_typed_term {
                             TypedTerm::HeapBinary(heap_binary) => heap_binary.full_byte_len(),
                             TypedTerm::ProcBin(process_binary) => process_binary.full_byte_len(),
+                            TypedTerm::BinaryLiteral(process_binary) => process_binary.full_byte_len(),
                             _ => unreachable!(),
                         };
 
