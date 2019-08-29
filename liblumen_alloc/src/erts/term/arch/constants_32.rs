@@ -160,7 +160,7 @@ pub const fn immediate1_value(term: u32) -> u32 {
 
 #[inline]
 pub const fn immediate2_value(term: u32) -> u32 {
-    (term & !MASK_IMMEDIATE2) >> IMMEDIATE1_VALUE_SHIFT
+    (term & !MASK_IMMEDIATE2) >> IMMEDIATE2_VALUE_SHIFT
 }
 
 #[inline]
